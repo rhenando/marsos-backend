@@ -19,7 +19,6 @@ import internalRoutes from "./routes/internal.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import adminUsersRoutes from "./routes/adminUsers.js";
 import adminStatsRoutes from "./routes/adminStats.js";
-
 import adminProductsRoutes from "./routes/adminProductsRoutes.js";
 
 // ───── Express App ─────
@@ -38,25 +37,30 @@ app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 app.use(requestLogger);
 
 // ─────────────────────────────────────────────
-// 🌍 CORS — Only allow whitelisted origins
+// 🌍 CORS — Allow whitelisted origins (from .env)
 // ─────────────────────────────────────────────
-const origins = ENV.ALLOWED_ORIGINS?.split(",")
-  .map((s) => s.trim())
+const allowedOrigins = ENV.ALLOWED_ORIGINS?.split(",")
+  .map((s) => s.trim().replace(/\/$/, "")) // normalize trailing slash
   .filter(Boolean);
 
 app.use(
   cors({
     origin(origin, cb) {
-      if (!origin) return cb(null, true); // allow Postman/cURL
-      if (origins.includes(origin)) return cb(null, true);
+      if (!origin) return cb(null, true); // allow Postman, curl, etc.
+      const normalized = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(normalized)) return cb(null, true);
+
+      console.warn(`❌ Blocked by CORS: ${origin}`);
       return cb(new Error("CORS not allowed"));
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 // ─────────────────────────────────────────────
-// 🛡 Helmet + CSP (content-security-policy)
+// 🛡 Helmet + CSP (Content Security Policy)
 // ─────────────────────────────────────────────
 const securityMiddlewares = helmetMiddleware();
 securityMiddlewares.forEach((m) => app.use(m));
@@ -67,12 +71,13 @@ securityMiddlewares.forEach((m) => app.use(m));
 app.use(createRateLimiter());
 
 // ─────────────────────────────────────────────
-// 💓 Healthcheck — no auth
+// 💓 Healthcheck (no auth)
 // ─────────────────────────────────────────────
-app.get("/healthz", (req, res) => res.status(200).json({ status: "ok" }));
+app.get("/healthz", (_, res) => res.status(200).json({ status: "ok" }));
 
 // ─────────────────────────────────────────────
 // 📦 Public Routes (user endpoints)
+// Includes: /api/check-phone
 // ─────────────────────────────────────────────
 app.use("/api", publicRoutes);
 
@@ -82,13 +87,12 @@ app.use("/api", publicRoutes);
 app.use("/internal", requireServiceRole(), internalRoutes);
 
 // ─────────────────────────────────────────────
-// 🧑‍💼 Admin Routes (JWT-authenticated users with admin role)
+// 🧑‍💼 Admin Routes (JWT-authenticated users)
 // ─────────────────────────────────────────────
 app.use("/api/admin/users", adminUsersRoutes);
 app.use("/api/admin/stats", adminStatsRoutes);
-app.use("/api/admin", adminRoutes);
-
 app.use("/api/admin/products", adminProductsRoutes);
+app.use("/api/admin", adminRoutes);
 
 // ─────────────────────────────────────────────
 // ⚠ Global Error Handler
@@ -100,9 +104,7 @@ app.use((err, req, res, next) => {
       ? "Internal Server Error"
       : err.message;
 
-  // Optional logging here (if you have pino/winston)
   console.error(`[Error ${status}] ${err.message}`);
-
   res.status(status).json({ error: msg });
 });
 
