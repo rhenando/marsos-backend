@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: marsos-backend
+spec:
+  selector:
+    app: marsos-backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5001
+  type: ClusterIP

@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: marsos-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: marsos-backend
+  template:
+    metadata:
+      labels:
+        app: marsos-backend
+    spec:
+      containers:
+        - name: app
+          image: your-registry/marsos-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5001
+          envFrom:
+            - secretRef:
+                name: marsos-backend-secret
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 5001
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 5001
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+      # optional: restrict node selection
+      # networkPolicy will restrict traffic
