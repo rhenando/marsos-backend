@@ -39,16 +39,26 @@ app.use(requestLogger);
 // ─────────────────────────────────────────────
 // 🌍 CORS — Allow whitelisted origins (from .env)
 // ─────────────────────────────────────────────
-const allowedOrigins = ENV.ALLOWED_ORIGINS?.split(",")
-  .map((s) => s.trim().replace(/\/$/, "")) // normalize trailing slash
-  .filter(Boolean);
+const allowedOrigins = ENV.ALLOWED_ORIGINS
+  ? ENV.ALLOWED_ORIGINS.split(",").map((s) => s.trim().replace(/\/$/, ""))
+  : ["https://marsos-frontend.vercel.app", "http://localhost:5173"];
+
+// 🧠 Debug: Show which origins are actually loaded
+console.log("🟢 Loaded allowed origins:", allowedOrigins);
 
 app.use(
   cors({
     origin(origin, cb) {
       if (!origin) return cb(null, true); // allow Postman, curl, etc.
       const normalized = origin.replace(/\/$/, "");
+
+      // ✅ Explicitly allow listed origins
       if (allowedOrigins.includes(normalized)) return cb(null, true);
+
+      // ✅ Allow all vercel preview branches (e.g. marsos-frontend-git-dev.vercel.app)
+      if (/^https:\/\/marsos-frontend.*\.vercel\.app$/.test(normalized)) {
+        return cb(null, true);
+      }
 
       console.warn(`❌ Blocked by CORS: ${origin}`);
       return cb(new Error("CORS not allowed"));
@@ -58,6 +68,9 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Handle preflight OPTIONS requests globally
+app.options("*", cors());
 
 // ─────────────────────────────────────────────
 // 🛡 Helmet + CSP (Content Security Policy)
