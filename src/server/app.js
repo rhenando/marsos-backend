@@ -126,9 +126,39 @@
 // // ─────────────────────────────────────────────
 // export default app;
 
+// server/app.js
 import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import { ENV } from "../env.js";
+import publicRoutes from "./routes/public.js";
+
 const app = express();
 
+// basic middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// enable CORS
+app.use(
+  cors({
+    origin: ["https://marsos-frontend.vercel.app", "http://localhost:5173"],
+    credentials: true,
+  })
+);
+
+// security headers
+app.use(helmet());
+
+// health check
 app.get("/healthz", (_, res) => res.json({ status: "ok" }));
+
+// your actual API routes
+app.use("/api", publicRoutes);
+
+// friendly root
+app.get("/", (_, res) => {
+  res.json({ ok: true, message: "Marsos Backend is running 🚀" });
+});
 
 export default app;
